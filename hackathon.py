@@ -40,7 +40,7 @@ def removeBG(frame):
 
 # Camera
 camera = cv2.VideoCapture(0)
-#camera.set(10, 200)
+camera.set(10, 200)
 cv2.namedWindow('trackbar')
 cv2.createTrackbar('trh1', 'trackbar', threshold, 100, printThreshold)
 
@@ -59,8 +59,6 @@ while camera.isOpened():
     #  Main operation
     if isBgCaptured == 1:  # this part wont run until background captured
         img = removeBG(frame)
-        #img = img[0:int(cap_region_y_end * frame.shape[0]),
-              #int(cap_region_x_begin * frame.shape[1]):frame.shape[1]]  # clip the ROI
         cv2.imshow('mask', img)
 
         # convert the image into binary image
@@ -83,9 +81,6 @@ while camera.isOpened():
             extTop = tuple(c[c[:, :, 1].argmin()][0])
             extBot = tuple(c[c[:, :, 1].argmax()][0])
             hull = cv2.convexHull(c)
-
-            #-------------------
-            #res = contours[ci]
             hull = cv2.convexHull(c)
             drawing = np.zeros(img.shape, np.uint8)
             cv2.drawContours(drawing, [c], 0, (0, 255, 0), 2)
