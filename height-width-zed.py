@@ -9,13 +9,22 @@ version = cv2.__version__.split('.')[0]
 
 #read video file
 cap = cv2.VideoCapture(0)
+bgSubThreshold = 60
 
-
-fgbg = cv2.createBackgroundSubtractorMOG2()
+fgbg = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
 
 print(cv2.__version__)
 font = cv2.FONT_HERSHEY_SIMPLEX
+
+def removeBG(frame):
+    fgmask = bgModel.apply(frame, learningRate=learningRate)
+    kernel = np.ones((3, 3), np.uint8)
+    fgmask = cv2.erode(fgmask, kernel, iterations=1)
+    res = cv2.bitwise_and(frame, frame, mask=fgmask)
+    return res
+
+
 while (cap.isOpened):
 
     #if ret is true than no error with cap.isOpened
@@ -25,12 +34,10 @@ while (cap.isOpened):
         #apply background substraction
         fgmask = fgbg.apply(frame)
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
-        fgmask = fgbg.apply(frame)
-        #gray = cv2.cvtColor(fgmask, cv2.COLOR_BGR2GRAY)
         gray = cv2.GaussianBlur(fgmask, (5, 5), 0)
         thresh = cv2.threshold(gray, 45, 255, cv2.THRESH_BINARY)[1]
         #thresh = cv2.erode(thresh, None, iterations=2)
-        thresh = cv2.dilate(thresh, None, iterations=2)
+        thresh = cv2.dilate(thresh, np.ones((3,3),np.uint8),iterations=3)
 
         cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
@@ -43,7 +50,7 @@ while (cap.isOpened):
             extTop = tuple(c[c[:, :, 1].argmin()][0])
             extBot = tuple(c[c[:, :, 1].argmax()][0])
             hull = cv2.convexHull(c)
-            cv2.drawContours(frame, hull, -1, (0, 255, 255), 2)
+            #cv2.drawContours(frame, hull, -1, (0, 255, 255), 2)
             cv2.circle(frame, extLeft, 8, (0, 0, 255), -1)
             cv2.circle(frame, extRight, 8, (0, 255, 0), -1)
             cv2.circle(frame, extTop, 8, (255, 0, 0), -1)
