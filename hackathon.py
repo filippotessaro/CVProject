@@ -38,6 +38,14 @@ def removeBG(frame):
     res = cv2.bitwise_and(frame, frame, mask=fgmask)
     return res
 
+def weightEstimation(body_surface, height):
+    weights = []
+    #Mosteller k, body_surface in m^2, height cm
+    mostellerWeight = (3600 * body_surface **2)/height
+    #DuBois & DuBois height m
+    duBoisWeight = (surface / (0.20247 * (height**0.725) )) ** (1/0.425)
+    weights.extend(mostellerWeight,)
+
 # Camera
 camera = cv2.VideoCapture(0)
 camera.set(10, 200)
@@ -80,15 +88,22 @@ while camera.isOpened():
             extRight = tuple(c[c[:, :, 0].argmax()][0])
             extTop = tuple(c[c[:, :, 1].argmin()][0])
             extBot = tuple(c[c[:, :, 1].argmax()][0])
-            hull = cv2.convexHull(c)
+
             hull = cv2.convexHull(c)
             drawing = np.zeros(img.shape, np.uint8)
+
             cv2.drawContours(drawing, [c], 0, (0, 255, 0), 2)
             cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
             cv2.circle(drawing, extLeft, 8, (0, 0, 255), -1)
             cv2.circle(drawing, extRight, 8, (0, 255, 0), -1)
             cv2.circle(drawing, extTop, 8, (255, 0, 0), -1)
             cv2.circle(drawing, extBot, 8, (255, 255, 0), -1)
+            (x, y, w, h) = cv2.boundingRect(c)
+
+            ## TODO: height and width of the rectangule box
+            ## TODO: proportion rectArea_REAL : rectAREA_PIXEL = shape_REAL : shape_PIXEL(OBTAINED FROM CONTOUR AREA)
+
+            cv2.rectangle(drawing, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
         cv2.imshow('output', drawing)
 
