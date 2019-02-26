@@ -11,6 +11,9 @@ import copy
 import math
 import time
 import pyautogui
+from scipy.spatial import distance
+import statistics as s
+
 
 
 camera_settings = sl.CAMERA_SETTINGS.CAMERA_SETTINGS_BRIGHTNESS
@@ -29,9 +32,14 @@ learningRate = 0
 bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
 
 
+area_pixel = 0
+area_msquares = 0
+
+
 # variables
 isBgCaptured = 0  # bool, whether the background captured
 triggerSwitch = False  # if true, keyborad simulator works
+font = cv2.FONT_HERSHEY_SIMPLEX
 
 
 def printThreshold(thr):
@@ -126,24 +134,47 @@ def main():
                 if length > 0:
                     c = max(contours, key=cv2.contourArea)
                     #cn = max(c, key=cv2.contourArea)
+                    (x, y, w, h) = cv2.boundingRect(c)
+                    area_pixel = w * h
 
+                    #Get the 3D coordinates of the points
                     extLeft = tuple(c[c[:, :, 0].argmin()][0])
-                    extRight = tuple(c[c[:, :, 0].argmax()][0])
-                    extTop = tuple(c[c[:, :, 1].argmin()][0])
-                    extBot = tuple(c[c[:, :, 1].argmax()][0])
+                    extLeft3D = point_cloud.get_value(extLeft[0], extLeft[1])
 
-                    point3D = point_cloud.get_value(extLeft[0], extLeft[1])
-                    print(point3D)
+                    extRight = tuple(c[c[:, :, 0].argmax()][0])
+                    extRight3D = point_cloud.get_value(extRight[0], extRight[1])
+
+                    extTop = tuple(c[c[:, :, 1].argmin()][0])
+                    extTop3D = point_cloud.get_value(extTop[0], extTop[1])
+
+                    extBot = tuple(c[c[:, :, 1].argmax()][0])
+                    extBot3D = point_cloud.get_value(extBot[0], extBot[1])
+
+                    #estimate real height and width in mm by euclidean distance
+                    real_height = distance.euclidean(extTop3D, extBot3D)
+                    real_width = distance.euclidean(extLeft3D, extRight3D)
+
+                    #find front human surface area in m2 by proportion
+                    area_msquares = (real_height/1000) * (real_width/1000)
+                    shape_real_m2 = cv2.contourArea(c) * (area_msquares/area_pixel)
+
+                    #weight estimation, double the surface area for the back
+                    measures = weightEstimation(shape_real_m2 * 2, real_height/1000)
+                    avgWeight = s.mean(measures)
 
                     hull = cv2.convexHull(c)
                     hull = cv2.convexHull(c)
                     drawing = np.zeros(img.shape, np.uint8)
+
+                    #draw all the shapes
                     cv2.drawContours(drawing, [c], 0, (0, 255, 0), 2)
                     cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
                     cv2.circle(drawing, extLeft, 8, (0, 0, 255), -1)
                     cv2.circle(drawing, extRight, 8, (0, 255, 0), -1)
                     cv2.circle(drawing, extTop, 8, (255, 0, 0), -1)
                     cv2.circle(drawing, extBot, 8, (255, 255, 0), -1)
+                    cv2.putText(drawing, avgWeight ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
+        			cv2.rectangle(drawing, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
                 cv2.imshow('output', drawing)
             key = cv2.waitKey(10)
