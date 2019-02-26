@@ -30,21 +30,24 @@ def printThreshold(thr):
 
 def removeBG(frame):
     fgmask = bgModel.apply(frame, learningRate=learningRate)
-    # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    # res = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
-
     kernel = np.ones((3, 3), np.uint8)
     fgmask = cv2.erode(fgmask, kernel, iterations=1)
     res = cv2.bitwise_and(frame, frame, mask=fgmask)
     return res
 
 def weightEstimation(body_surface, height):
+    '''
+    given the body surface in m^2 and the height in m
+    returns a list of estimated weights in kg
+    '''
     weights = []
     #Mosteller k, body_surface in m^2, height cm
-    mostellerWeight = (3600 * body_surface **2)/height
+    cm_height = height * 100
+    mostellerWeight = (3600 * body_surface **2)/cm_height
     #DuBois & DuBois height m
     duBoisWeight = (surface / (0.20247 * (height**0.725) )) ** (1/0.425)
-    weights.extend(mostellerWeight,)
+    weights.extend(mostellerWeight, duBoisWeight)
+    return weights
 
 # Camera
 camera = cv2.VideoCapture(0)
@@ -60,8 +63,6 @@ while camera.isOpened():
     threshold = cv2.getTrackbarPos('trh1', 'trackbar')
     frame = cv2.bilateralFilter(frame, 5, 50, 100)  # smoothing filter
     frame = cv2.flip(frame, 1)  # flip the frame horizontally
-    #cv2.rectangle(frame, (int(cap_region_x_begin * frame.shape[1]), 0),
-                  #(frame.shape[1], int(cap_region_y_end * frame.shape[0])), (255, 0, 0), 2)
     cv2.imshow('original', frame)
 
     #  Main operation

@@ -10,29 +10,28 @@ import numpy as np
 import copy
 import math
 import time
-from pynput.mouse import Button, Controller
 import pyautogui
 
 
 camera_settings = sl.CAMERA_SETTINGS.CAMERA_SETTINGS_BRIGHTNESS
+camera_settings.camera_resolution = sl.RESOLUTION.RESOLUTION_HD720  # Use HD720 video mode (default fps: 60)
+
 str_camera_settings = "BRIGHTNESS"
 step_camera_settings = 1
 
 #----Added parameters
 # parameters
-cap_region_x_begin = 0.5  # start point/total width
-cap_region_y_end = 0.8  # start point/total width
+
 threshold = 60  # BINARY threshold
 blurValue = 41  # GaussianBlur parameter
 bgSubThreshold = 50
 learningRate = 0
+bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
+
 
 # variables
 isBgCaptured = 0  # bool, whether the background captured
 triggerSwitch = False  # if true, keyborad simulator works
-globalCounterNext = 0
-globalCounterPrevious = 0
-mouse = Controller()
 
 
 def printThreshold(thr):
@@ -41,13 +40,25 @@ def printThreshold(thr):
 
 def removeBG(frame):
     fgmask = bgModel.apply(frame, learningRate=learningRate)
-    # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    # res = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
-
     kernel = np.ones((3, 3), np.uint8)
     fgmask = cv2.erode(fgmask, kernel, iterations=1)
     res = cv2.bitwise_and(frame, frame, mask=fgmask)
     return res
+
+def weightEstimation(body_surface, height):
+    '''
+    given the body surface in m^2 and the height in m
+    returns a list of estimated weights in kg
+    '''
+    weights = []
+    #Mosteller k, body_surface in m^2, height cm
+    cm_height = height * 100
+    mostellerWeight = (3600 * body_surface **2)/cm_height
+    #DuBois & DuBois height m
+    duBoisWeight = (surface / (0.20247 * (height**0.725) )) ** (1/0.425)
+    weights.extend(mostellerWeight, duBoisWeight)
+    return weights
+
 #-----------------------------------------
 
 def main():
@@ -68,6 +79,7 @@ def main():
     runtime = sl.RuntimeParameters()
     mat = sl.Mat()
     depth_map = sl.Mat()
+    point_cloud = sl.Mat()
 
     cv2.namedWindow('trackbar')
     cv2.createTrackbar('trh1', 'trackbar', threshold, 100, printThreshold)
@@ -76,23 +88,22 @@ def main():
     isBgCaptured = 0
 
     print_camera_information(cam)
-    print_help()
+    #print_help()
 
     key = ''
-    while key != 113:  # for 'q' key
+    while True:  # for 'q' key
         err = cam.grab(runtime)
         if err == sl.ERROR_CODE.SUCCESS:
             cam.retrieve_image(mat, sl.VIEW.VIEW_LEFT)
-            #cam.retrieve_measure(depth_map, sl.MEASURE.MEASURE_DEPTH) # Retrieve depth
 
-            point_cloud = sl.Mat()
             cam.retrieve_measure(point_cloud, sl.MEASURE.MEASURE_XYZRGBA)
 
             frame = mat.get_data()
+            frame  = cv2.cvtColor(frame,cv2.COLOR_RGBA2RGB)
+
             frame = cv2.bilateralFilter(frame, 5, 50, 100)  # smoothing filter
             frame = cv2.flip(frame, 1)  # flip the frame horizontally
-            #cv2.rectangle(frame, (int(cap_region_x_begin * frame.shape[1]), 0),
-                          #(frame.shape[1], int(cap_region_y_end * frame.shape[0])), (255, 0, 0), 2)
+
             cv2.imshow('original', frame)
 
             #  Main operation
@@ -115,10 +126,15 @@ def main():
                 if length > 0:
                     c = max(contours, key=cv2.contourArea)
                     #cn = max(c, key=cv2.contourArea)
+
                     extLeft = tuple(c[c[:, :, 0].argmin()][0])
                     extRight = tuple(c[c[:, :, 0].argmax()][0])
                     extTop = tuple(c[c[:, :, 1].argmin()][0])
                     extBot = tuple(c[c[:, :, 1].argmax()][0])
+
+                    point3D = point_cloud.get_value(extLeft[0], extLeft[1])
+                    print(point3D)
+
                     hull = cv2.convexHull(c)
                     hull = cv2.convexHull(c)
                     drawing = np.zeros(img.shape, np.uint8)
@@ -130,11 +146,6 @@ def main():
                     cv2.circle(drawing, extBot, 8, (255, 255, 0), -1)
 
                 cv2.imshow('output', drawing)
-
-
-            #key = cv2.waitKey(5)
-            #settings(key, cam, runtime, mat)
-            # Keyboard OP
             key = cv2.waitKey(10)
             if key == 27:  # press ESC to exit
                 break
