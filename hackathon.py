@@ -49,11 +49,25 @@ def weightEstimation(body_surface, height):
     weights.extend(mostellerWeight, duBoisWeight)
     return weights
 
+def adjust_gamma(image, gamma=1.0):
+	# build a lookup table mapping the pixel values [0, 255] to
+	# their adjusted gamma values
+	invGamma = 1.0 / gamma
+	table = np.array([((i / 255.0) ** invGamma) * 255
+		for i in np.arange(0, 256)]).astype("uint8")
+
+	# apply gamma correction using the lookup table
+	return cv2.LUT(image, table)
+
+
 # Camera
 camera = cv2.VideoCapture(0)
 camera.set(10, 200)
+
+gamma = 1
 cv2.namedWindow('trackbar')
 cv2.createTrackbar('trh1', 'trackbar', threshold, 100, printThreshold)
+cv2.createTrackbar('trh2', 'trackbar', gamma, 100, printThreshold)
 
 bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
 isBgCaptured = 0
@@ -61,6 +75,9 @@ isBgCaptured = 0
 while camera.isOpened():
     ret, frame = camera.read()
     threshold = cv2.getTrackbarPos('trh1', 'trackbar')
+    gamma = cv2.getTrackbarPos('trh2', 'trackbar')
+    gamma = gamma if gamma > 0 else 0.1
+    frame = adjust_gamma(frame, gamma=gamma)
     frame = cv2.bilateralFilter(frame, 5, 50, 100)  # smoothing filter
     frame = cv2.flip(frame, 1)  # flip the frame horizontally
     cv2.imshow('original', frame)

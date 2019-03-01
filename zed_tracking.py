@@ -29,6 +29,9 @@ threshold = 60  # BINARY threshold
 blurValue = 41  # GaussianBlur parameter
 bgSubThreshold = 50
 learningRate = 0
+cap_region_x_begin = 0.5  # start point/total width
+cap_region_y_end = 0.8  # start point/total width
+
 
 
 area_pixel = 0
@@ -216,7 +219,9 @@ while True:  # for 'q' key
         #  Main operation
         if isBgCaptured == 1:  # this part wont run until background captured
             img = removeBG(frame)
+            #img = img[0:int(cap_region_y_end * frame.shape[0]), int(cap_region_x_begin * frame.shape[1]):frame.shape[1]]  # clip the ROI
             cv2.imshow('mask', img)
+            #cv2.imshow('mask', img)
 
             # convert the image into binary image
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
