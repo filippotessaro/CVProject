@@ -187,6 +187,9 @@ def printAlpha(alpha):
 
 def printBeta(beta):
     print('Beta:', str(beta))
+
+def applyAlpha(alpha_percentage):
+    return alpha_percentage * ((3.0 - 1.0)/100) + 1.0
 #-------------------------------------MAIN------------------------------------------------
 print("Running...")
 init = sl.InitParameters()
@@ -211,11 +214,12 @@ point_cloud = sl.Mat()
 gamma = 1
 alpha = 1.0 # Simple contrast control
 beta = 0    # Simple brightness control
+alpha_percentage = 0
 
 cv2.namedWindow('trackbar')
 cv2.createTrackbar('trh1', 'trackbar', threshold, 100, printThreshold)
 cv2.createTrackbar('trh2', 'trackbar', gamma, 100, printThreshold)
-#cv2.createTrackbar('alpha', 'trackbar', alpha, 100, printAlpha)
+cv2.createTrackbar('alpha', 'trackbar', alpha_percentage, 100, printAlpha)
 cv2.createTrackbar('beta', 'trackbar', beta, 100, printBeta)
 
 
@@ -242,6 +246,9 @@ while True:  # for 'q' key
 
         threshold = cv2.getTrackbarPos('trh1', 'trackbar')
         gamma = cv2.getTrackbarPos('trh2', 'trackbar')
+        alpha_percentage = cv2.getTrackbarPos('alpha', 'trackbar')
+        alpha = applyAlpha(alpha_percentage)
+
         beta = cv2.getTrackbarPos('beta', 'trackbar')
         gamma = gamma if gamma > 0 else 0.1
         frame = adjust_gamma(frame, gamma=gamma)
