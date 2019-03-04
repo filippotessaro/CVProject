@@ -170,6 +170,23 @@ def record(cam, runtime, mat):
     print("Recording finished.")
     cv2.destroyAllWindows()
 
+
+def adjust_gamma(image, gamma=1.0):
+	# build a lookup table mapping the pixel values [0, 255] to
+	# their adjusted gamma values
+	invGamma = 1.0 / gamma
+	table = np.array([((i / 255.0) ** invGamma) * 255
+		for i in np.arange(0, 256)]).astype("uint8")
+
+	# apply gamma correction using the lookup table
+	return cv2.LUT(image, table)
+
+
+def printAlpha(alpha):
+    print('Alpha:', str(alpha))
+
+def printBeta(beta):
+    print('Beta:', str(beta))
 #-------------------------------------MAIN------------------------------------------------
 print("Running...")
 init = sl.InitParameters()
@@ -191,14 +208,26 @@ mat = sl.Mat()
 depth_map = sl.Mat()
 point_cloud = sl.Mat()
 
+gamma = 1
+alpha = 1.0 # Simple contrast control
+beta = 0    # Simple brightness control
+
 cv2.namedWindow('trackbar')
 cv2.createTrackbar('trh1', 'trackbar', threshold, 100, printThreshold)
+cv2.createTrackbar('trh2', 'trackbar', gamma, 100, printThreshold)
+#cv2.createTrackbar('alpha', 'trackbar', alpha, 100, printAlpha)
+cv2.createTrackbar('beta', 'trackbar', beta, 100, printBeta)
+
+
 
 bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
 isBgCaptured = 0
 
 print_camera_information(cam)
 print_help()
+
+f = open("measures.txt", "a")
+
 
 key = ''
 while True:  # for 'q' key
@@ -210,6 +239,15 @@ while True:  # for 'q' key
 
         frame = mat.get_data()
         frame  = cv2.cvtColor(frame,cv2.COLOR_RGBA2RGB)
+
+        threshold = cv2.getTrackbarPos('trh1', 'trackbar')
+        gamma = cv2.getTrackbarPos('trh2', 'trackbar')
+        beta = cv2.getTrackbarPos('beta', 'trackbar')
+        gamma = gamma if gamma > 0 else 0.1
+        frame = adjust_gamma(frame, gamma=gamma)
+        frame = cv2.convertScaleAbs(frame, alpha=alpha, beta=beta)
+        frame = cv2.normalize(frame,  frame, 0, 255, cv2.NORM_MINMAX)
+
 
         frame = cv2.bilateralFilter(frame, 5, 50, 100)  # smoothing filter
         frame = cv2.flip(frame, 1)  # flip the frame horizontally
@@ -268,6 +306,7 @@ while True:  # for 'q' key
                     measures = weightEstimation(shape_real_m2 * 2, real_height/1000)
                     avgWeight = s.mean(measures)
                     print('Weight:', avgWeight)
+                    f.write("{0:.2f}".format(avgWeight) + '\n')
                     cv2.putText(drawing, "Weight: " + str(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
 
                 hull = cv2.convexHull(c)
@@ -298,6 +337,6 @@ while True:  # for 'q' key
         elif key == ord('n'):
             triggerSwitch = True
 cv2.destroyAllWindows()
-
+f.close()
 cam.close()
 print("\nFINISH")
