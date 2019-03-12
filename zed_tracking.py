@@ -1,9 +1,7 @@
 import cv2
 import pyzed.sl as sl
-
 import numpy as np
 import sys
-
 import app as app
 import cv2
 import numpy as np
@@ -13,11 +11,7 @@ import time
 import pyautogui
 from scipy.spatial import distance
 import statistics as s
-
 import pandas as pd
-
-
-
 
 camera_settings = sl.CAMERA_SETTINGS.CAMERA_SETTINGS_BRIGHTNESS
 camera_settings.camera_resolution = sl.RESOLUTION.RESOLUTION_HD720  # Use HD720 video mode (default fps: 60)
@@ -28,9 +22,9 @@ step_camera_settings = 1
 #----Added parameters
 # parameters
 
-threshold = 10  # BINARY threshold
+threshold = 6  # BINARY threshold
 blurValue = 41  # GaussianBlur parameter
-bgSubThreshold = 50 #Init 50
+bgSubThreshold = 60 #Init 50
 learningRate = 0
 
 area_pixel = 0
@@ -61,6 +55,8 @@ def weightEstimation(body_surface, height):
     mostellerWeight = (3600 * body_surface **2)/cm_height
     #DuBois & DuBois height m
     duBoisWeight = (body_surface / (0.20247 * (height**0.725) )) ** (1/0.425)
+    #print('mostellerWeight:', mostellerWeight, 'duBoisWeight:', duBoisWeight)
+
     weights.append(mostellerWeight)
     weights.append(duBoisWeight)
     return weights
@@ -78,7 +74,7 @@ def print_help():
     print("  Increase camera settings value:     +")
     print("  Decrease camera settings value:     -")
     print("  Switch camera settings:             s")
-    print("  Reset all parameters:               r")
+    print("  Reset all parameters:               a")
     print("  Record a video:                     z")
     print("  Quit:                               q\n")
 
@@ -95,7 +91,7 @@ def settings(key, cam, runtime, mat):
         if current_value >= 1:
             cam.set_camera_settings(camera_settings, current_value - step_camera_settings)
             print(str_camera_settings + ": " + str(current_value - step_camera_settings))
-    elif key == 114:  # for 'r' key
+    elif key == ord('a'):  # for 'a' key
         cam.set_camera_settings(sl.CAMERA_SETTINGS.CAMERA_SETTINGS_BRIGHTNESS, -1, True)
         cam.set_camera_settings(sl.CAMERA_SETTINGS.CAMERA_SETTINGS_CONTRAST, -1, True)
         cam.set_camera_settings(sl.CAMERA_SETTINGS.CAMERA_SETTINGS_HUE, -1, True)
@@ -187,13 +183,13 @@ def printBeta(beta):
 
 def applyAlpha(alpha_percentage):
     return alpha_percentage * ((3.0 - 1.0)/100) + 1.0
+
 #-------------------------------------MAIN------------------------------------------------
 print("Running...")
 init = sl.InitParameters()
 init.depth_mode = sl.DEPTH_MODE.DEPTH_MODE_ULTRA # Use ULTRA depth mode
 init.coordinate_units = sl.UNIT.UNIT_MILLIMETER # Use millimeter units (for depth measurements)
 font = cv2.FONT_HERSHEY_SIMPLEX
-
 
 cam = sl.Camera()
 if not cam.is_opened():
@@ -215,11 +211,9 @@ alpha_percentage = 0
 
 cv2.namedWindow('trackbar')
 cv2.createTrackbar('trh1', 'trackbar', threshold, 100, printThreshold)
-cv2.createTrackbar('trh2', 'trackbar', gamma, 100, printThreshold)
+#cv2.createTrackbar('trh2', 'trackbar', gamma, 100, printThreshold)
 cv2.createTrackbar('alpha', 'trackbar', alpha_percentage, 100, printAlpha)
 cv2.createTrackbar('beta', 'trackbar', beta, 100, printBeta)
-
-
 
 bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
 isBgCaptured = 0
@@ -246,38 +240,34 @@ while True:  # for 'q' key
         frame  = cv2.cvtColor(frame,cv2.COLOR_RGBA2RGB)
 
         threshold = cv2.getTrackbarPos('trh1', 'trackbar')
-        gamma = cv2.getTrackbarPos('trh2', 'trackbar')
+        #gamma = cv2.getTrackbarPos('trh2', 'trackbar')
         alpha_percentage = cv2.getTrackbarPos('alpha', 'trackbar')
         alpha = applyAlpha(alpha_percentage)
 
         beta = cv2.getTrackbarPos('beta', 'trackbar')
-        gamma = gamma if gamma > 0 else 0.1
-        frame = adjust_gamma(frame, gamma=gamma)
+        #gamma = gamma if gamma > 0 else 0.1
+        #frame = adjust_gamma(frame, gamma=gamma)
         frame = cv2.convertScaleAbs(frame, alpha=alpha, beta=beta)
-        frame = cv2.normalize(frame,  frame, 0, 255, cv2.NORM_MINMAX)
-
-
+        #frame = cv2.normalize(frame,  frame, 0, 255, cv2.NORM_MINMAX)
         frame = cv2.bilateralFilter(frame, 5, 50, 100)  # smoothing filter
+        #frame = cv2.bilateralFilter(frame, 9, 75, 75)
         frame = cv2.flip(frame, 1)  # flip the frame horizontally
 
         cv2.imshow('trackbar', frame)
+        settings(key, cam, runtime, mat)
 
         #  Main operation
         if isBgCaptured == 1:  # this part wont run until background captured
             img = removeBG(frame)
-            #img = img[0:int(cap_region_y_end * frame.shape[0]), int(cap_region_x_begin * frame.shape[1]):frame.shape[1]]  # clip the ROI
             cv2.imshow('mask', img)
 
             # convert the image into binary image
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            blur = cv2.GaussianBlur(gray, (25, 25), 0)
-            #blur = cv2.bilateralFilter(blur,15,75,75)
+            #gray = cv2.bilateralFilter(gray, 5, 50, 100)
+            blur = cv2.GaussianBlur(gray, (blurValue, blurValue), 0)
 
-            #blur = cv2.GaussianBlur(gray, (10,10) ,0)
-            #blur = cv2.medianBlur(gray, 5)
-
-            #cv2.imshow('blur', blur)
-            ret, thresh = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
+            cv2.imshow('blur', blur)
+            ret, thresh = cv2.threshold(blur, threshold, 255, cv2.THRESH_BINARY)
             cv2.imshow('ori', thresh)
 
             # get the coutours
@@ -287,7 +277,6 @@ while True:  # for 'q' key
             #maxArea = -1
             if length > 0:
                 c = max(contours, key=cv2.contourArea)
-                #cn = max(c, key=cv2.contourArea)
                 (x, y, w, h) = cv2.boundingRect(c)
                 area_pixel = w * h
                 drawing = np.zeros(img.shape, np.uint8)
@@ -295,7 +284,6 @@ while True:  # for 'q' key
                 #Get the 3D coordinates of the points
                 extLeft = tuple(c[c[:, :, 0].argmin()][0])
                 extLeft3D = point_cloud.get_value(extLeft[0], extLeft[1])
-                #print(extLeft3D[0])
 
                 extRight = tuple(c[c[:, :, 0].argmax()][0])
                 extRight3D = point_cloud.get_value(extRight[0], extRight[1])
@@ -307,8 +295,8 @@ while True:  # for 'q' key
                 extBot3D = point_cloud.get_value(extBot[0], extBot[1])
 
                 #width an height of the extreme points
-                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])*(extTop3D[1][0]-extBot3D[1][0]) + (extTop3D[1][1]-extBot3D[1][1])*(extTop3D[1][1]-extBot3D[1][1]) + (extTop3D[1][2]-extBot3D[1][2])*(extTop3D[1][2]-extBot3D[1][2]))
-                real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])*(extLeft3D[1][0]-extRight3D[1][0]) + (extLeft3D[1][1]-extRight3D[1][1])*(extLeft3D[1][1]-extRight3D[1][1]) + (extLeft3D[1][2]-extRight3D[1][2])*(extLeft3D[1][2]-extRight3D[1][2]))
+                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 + (extTop3D[1][2]-extBot3D[1][2])**2)
+                real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2 + (extLeft3D[1][2]-extRight3D[1][2])**2)
                 print('Height', real_height)
                 #estimate real height and width in mm by euclidean distance
                 if(not np.isnan(real_height) and not np.isinf(real_height) and not np.isnan(real_width) and not np.isinf(real_width)):
@@ -322,11 +310,10 @@ while True:  # for 'q' key
                         measures = weightEstimation(shape_real_m2 * 2, real_height/1000)
                         avgWeight = s.mean(measures)
                         print('Weight:', avgWeight)
+
                         if (avgWeight < 150 and avgWeight > 40):
                             f.write("{0:.2f}".format(avgWeight) + '\n')
-                            #pd = pd.append([{'height':"{0:.2f}".format(real_height)}], ignore_index=True)
                             df = df.append(pd.Series([real_height, real_width, shape_real_m2 * 2, avgWeight], index=df.columns ), ignore_index=True)
-
                             cv2.putText(drawing, "Weight: " + "{0:.2f}".format(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
 
                 hull = cv2.convexHull(c)
@@ -342,6 +329,7 @@ while True:  # for 'q' key
                 cv2.rectangle(drawing, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
             cv2.imshow('output', drawing)
+
         key = cv2.waitKey(10)
         if key == 27:  # press ESC to exit
             break
@@ -351,15 +339,14 @@ while True:  # for 'q' key
             print('!!!Background Captured!!!')
         elif key == ord('r'):  # press 'r' to reset the background
             bgModel = None
-            triggerSwitch = False
+            #triggerSwitch = False
             isBgCaptured = 0
             print('!!!Reset BackGround!!!')
-        elif key == ord('n'):
-            triggerSwitch = True
+
 cv2.destroyAllWindows()
 f.close()
 h_file.close()
 cam.close()
+#export csv
 df.to_csv('measuresdataframe.csv', sep='\t')
-
 print("\nFINISH")
