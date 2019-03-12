@@ -14,6 +14,9 @@ import pyautogui
 from scipy.spatial import distance
 import statistics as s
 
+import pandas as pd
+
+
 
 
 camera_settings = sl.CAMERA_SETTINGS.CAMERA_SETTINGS_BRIGHTNESS
@@ -25,18 +28,13 @@ step_camera_settings = 1
 #----Added parameters
 # parameters
 
-threshold = 6  # BINARY threshold
+threshold = 10  # BINARY threshold
 blurValue = 41  # GaussianBlur parameter
 bgSubThreshold = 50 #Init 50
 learningRate = 0
-#cap_region_x_begin = 0.5  # start point/total width
-#cap_region_y_end = 0.8  # start point/total width
-
-
 
 area_pixel = 0
 area_msquares = 0
-
 
 # variables
 isBgCaptured = 0  # bool, whether the background captured
@@ -44,7 +42,6 @@ triggerSwitch = False  # if true, keyborad simulator works
 
 def printThreshold(thr):
     print("! Changed threshold to " + str(thr))
-
 
 def removeBG(frame):
     fgmask = bgModel.apply(frame, learningRate=learningRate)
@@ -218,7 +215,7 @@ alpha_percentage = 0
 
 cv2.namedWindow('trackbar')
 cv2.createTrackbar('trh1', 'trackbar', threshold, 100, printThreshold)
-#cv2.createTrackbar('trh2', 'trackbar', gamma, 100, printThreshold)
+cv2.createTrackbar('trh2', 'trackbar', gamma, 100, printThreshold)
 cv2.createTrackbar('alpha', 'trackbar', alpha_percentage, 100, printAlpha)
 cv2.createTrackbar('beta', 'trackbar', beta, 100, printBeta)
 
@@ -227,12 +224,15 @@ cv2.createTrackbar('beta', 'trackbar', beta, 100, printBeta)
 bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
 isBgCaptured = 0
 
+#initialized dataframe for measures
+df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'weight'])
+
+
 print_camera_information(cam)
 print_help()
 
 f = open("measures.txt", "a")
 h_file = open("height.txt", "a")
-
 
 key = ''
 while True:  # for 'q' key
@@ -246,13 +246,13 @@ while True:  # for 'q' key
         frame  = cv2.cvtColor(frame,cv2.COLOR_RGBA2RGB)
 
         threshold = cv2.getTrackbarPos('trh1', 'trackbar')
-        #gamma = cv2.getTrackbarPos('trh2', 'trackbar')
+        gamma = cv2.getTrackbarPos('trh2', 'trackbar')
         alpha_percentage = cv2.getTrackbarPos('alpha', 'trackbar')
         alpha = applyAlpha(alpha_percentage)
 
         beta = cv2.getTrackbarPos('beta', 'trackbar')
-        #gamma = gamma if gamma > 0 else 0.1
-        #frame = adjust_gamma(frame, gamma=gamma)
+        gamma = gamma if gamma > 0 else 0.1
+        frame = adjust_gamma(frame, gamma=gamma)
         frame = cv2.convertScaleAbs(frame, alpha=alpha, beta=beta)
         frame = cv2.normalize(frame,  frame, 0, 255, cv2.NORM_MINMAX)
 
@@ -267,14 +267,18 @@ while True:  # for 'q' key
             img = removeBG(frame)
             #img = img[0:int(cap_region_y_end * frame.shape[0]), int(cap_region_x_begin * frame.shape[1]):frame.shape[1]]  # clip the ROI
             cv2.imshow('mask', img)
-            #cv2.imshow('mask', img)
 
             # convert the image into binary image
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            blur = cv2.GaussianBlur(gray, (blurValue, blurValue), 0)
-            cv2.imshow('blur', blur)
-            ret, thresh = cv2.threshold(blur, threshold, 255, cv2.THRESH_BINARY)
-            #cv2.imshow('ori', thresh)
+            blur = cv2.GaussianBlur(gray, (25, 25), 0)
+            #blur = cv2.bilateralFilter(blur,15,75,75)
+
+            #blur = cv2.GaussianBlur(gray, (10,10) ,0)
+            #blur = cv2.medianBlur(gray, 5)
+
+            #cv2.imshow('blur', blur)
+            ret, thresh = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
+            cv2.imshow('ori', thresh)
 
             # get the coutours
             thresh1 = copy.deepcopy(thresh)
@@ -310,7 +314,7 @@ while True:  # for 'q' key
                 if(not np.isnan(real_height) and not np.isinf(real_height) and not np.isnan(real_width) and not np.isinf(real_width)):
                     #find FRONT human surface area in m2 by proportion
                     h_file.write("{0:.2f}".format(real_height) + '\n')
-                    if (real_height<2000 and real_width<1000):
+                    if (real_height < 2000 and (not real_height == 0) and real_width < 1250 and (not real_width == 0)):
                         area_msquares = (real_height/1000) * (real_width/1000)
                         shape_real_m2 = cv2.contourArea(c) * (area_msquares/area_pixel)
 
@@ -318,8 +322,11 @@ while True:  # for 'q' key
                         measures = weightEstimation(shape_real_m2 * 2, real_height/1000)
                         avgWeight = s.mean(measures)
                         print('Weight:', avgWeight)
-                        if (avgWeight < 150.0 and avgWeight > 40.0):
+                        if (avgWeight < 150 and avgWeight > 40):
                             f.write("{0:.2f}".format(avgWeight) + '\n')
+                            #pd = pd.append([{'height':"{0:.2f}".format(real_height)}], ignore_index=True)
+                            df = df.append(pd.Series([real_height, real_width, shape_real_m2 * 2, avgWeight], index=df.columns ), ignore_index=True)
+
                             cv2.putText(drawing, "Weight: " + "{0:.2f}".format(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
 
                 hull = cv2.convexHull(c)
@@ -353,4 +360,6 @@ cv2.destroyAllWindows()
 f.close()
 h_file.close()
 cam.close()
+df.to_csv('measuresdataframe.csv', sep='\t')
+
 print("\nFINISH")

@@ -6,6 +6,7 @@ import math
 import time
 from pynput.mouse import Button, Controller
 import pyautogui
+import pandas as pd
 
 
 # parameters
@@ -63,6 +64,9 @@ def adjust_gamma(image, gamma=1.0):
 # Camera
 camera = cv2.VideoCapture(0)
 camera.set(10, 200)
+
+df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'weight'])
+
 
 gamma = 1
 cv2.namedWindow('trackbar')
