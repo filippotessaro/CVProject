@@ -212,7 +212,7 @@ cv2.createTrackbar('alpha', 'trackbar', alpha_percentage, 100, printAlpha)
 cv2.createTrackbar('beta', 'trackbar', beta, 100, printBeta)
 
 bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
-isBgCaptured = 0
+isBgCaptured = False
 
 #initialized dataframe for measures
 df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'weight'])
@@ -246,23 +246,29 @@ while True:  # for 'q' key
         #frame = cv2.normalize(frame,  frame, 0, 255, cv2.NORM_MINMAX)
         frame = cv2.bilateralFilter(frame, 5, 50, 100)  # smoothing filter
         frame = cv2.flip(frame, 1)  # flip the frame horizontally
-
         cv2.imshow('trackbar', frame)
+
         settings(key, cam, runtime, mat)
 
         #  Main operation
-        if isBgCaptured == 1:  # this part wont run until background captured
-            img = removeBG(frame)
+        if isBgCaptured:  # this part wont run until background captured
+            #img = removeBG(frame)
+            blur = cv2.GaussianBlur(frame,(5,5),0)
+
+            img =  bgModel.apply(blur, learningRate=learningRate)
             cv2.imshow('mask', img)
 
             # convert the image into binary image
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            #gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-            blur = cv2.GaussianBlur(gray, (blurValue, blurValue), 0)
+            #blur = cv2.GaussianBlur(img, (blurValue, blurValue), 0)
 
-            cv2.imshow('blur', blur)
-            ret, thresh = cv2.threshold(blur, threshold, 255, cv2.THRESH_BINARY)
-            cv2.imshow('ori', thresh)
+            #cv2.imshow('blur', blur)
+
+            ret,thresh = cv2.threshold(img,threshold,255,cv2.THRESH_BINARY)
+
+            #ret, thresh = cv2.threshold(img, 255, 255, cv2.THRESH_BINARY)
+            cv2.imshow('threshold', thresh)
 
             # get the coutours
             thresh1 = copy.deepcopy(thresh)
@@ -273,7 +279,7 @@ while True:  # for 'q' key
                 c = max(contours, key=cv2.contourArea)
                 (x, y, w, h) = cv2.boundingRect(c)
                 area_pixel = w * h
-                drawing = np.zeros(img.shape, np.uint8)
+                #drawing = np.zeros(img.shape, np.uint8)
 
                 #Get the 3D coordinates of the points
                 extLeft = tuple(c[c[:, :, 0].argmin()][0])
@@ -296,7 +302,7 @@ while True:  # for 'q' key
                 if(not np.isnan(real_height) and not np.isinf(real_height) and not np.isnan(real_width) and not np.isinf(real_width)):
                     #find FRONT human surface area in m2 by proportion
                     h_file.write("{0:.2f}".format(real_height) + '\n')
-                    if (real_height < 2000 and (not real_height == 0) and real_width < 1250 and (not real_width == 0)):
+                    if (real_height < 2000 and (not real_height == 0) and real_width < 1000 and (not real_width == 0)):
                         area_msquares = (real_height/1000) * (real_width/1000)
                         shape_real_m2 = cv2.contourArea(c) * (area_msquares/area_pixel)
 
@@ -308,28 +314,31 @@ while True:  # for 'q' key
                         if (avgWeight < 150 and avgWeight > 40):
                             f.write("{0:.2f}".format(avgWeight) + '\n')
                             df = df.append(pd.Series([real_height, real_width, shape_real_m2 * 2, avgWeight], index=df.columns ), ignore_index=True)
-                            cv2.putText(drawing, "Weight: " + "{0:.2f}".format(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
+                            cv2.putText(frame, "Weight: " + "{0:.2f}".format(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
 
                 hull = cv2.convexHull(c)
                 hull = cv2.convexHull(c)
 
                 #draw all the shapes
-                cv2.drawContours(drawing, [c], 0, (0, 255, 0), 2)
-                cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
-                cv2.circle(drawing, extLeft, 8, (0, 0, 255), -1)
-                cv2.circle(drawing, extRight, 8, (0, 255, 0), -1)
-                cv2.circle(drawing, extTop, 8, (255, 0, 0), -1)
-                cv2.circle(drawing, extBot, 8, (255, 255, 0), -1)
-                cv2.rectangle(drawing, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                cv2.drawContours(frame, [c], 0, (0, 255, 0), 2)
+                cv2.drawContours(frame, [hull], 0, (0, 0, 255), 3)
+                cv2.circle(frame, extLeft, 8, (0, 0, 255), -1)
+                cv2.circle(frame, extRight, 8, (0, 255, 0), -1)
+                cv2.circle(frame, extTop, 8, (255, 0, 0), -1)
+                cv2.circle(frame, extBot, 8, (255, 255, 0), -1)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-            cv2.imshow('output', drawing)
+            #cv2.imshow('thresh', thresh)
+            cv2.imshow('output', frame)
+
 
         key = cv2.waitKey(10)
         if key == 27:  # press ESC to exit
             break
         elif key == ord('b'):  # press 'b' to capture the background
-            bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold, detectShadows = True)
-            isBgCaptured = 1
+            bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
+            #bgModel = cv2.createBackgroundSubtractorMOG2()
+            isBgCaptured = True
             print('!!!Background Captured!!!')
         elif key == ord('r'):  # press 'r' to reset the background
             bgModel = None
