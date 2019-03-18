@@ -34,12 +34,6 @@ isBgCaptured = 0  # bool, whether the background captured
 def printThreshold(thr):
     print("! Changed threshold to " + str(thr))
 
-def removeBG(frame):
-    fgmask = bgModel.apply(frame, learningRate=learningRate)
-    kernel = np.ones((3, 3), np.uint8)
-    fgmask = cv2.erode(fgmask, kernel, iterations=1)
-    res = cv2.bitwise_and(frame, frame, mask=fgmask)
-    return res
 
 def weightEstimation(body_surface, height):
     '''
@@ -240,10 +234,7 @@ while True:  # for 'q' key
         alpha = applyAlpha(alpha_percentage)
 
         beta = cv2.getTrackbarPos('beta', 'trackbar')
-        #gamma = gamma if gamma > 0 else 0.1
-        #frame = adjust_gamma(frame, gamma=gamma)
         frame = cv2.convertScaleAbs(frame, alpha=alpha, beta=beta)
-        #frame = cv2.normalize(frame,  frame, 0, 255, cv2.NORM_MINMAX)
         frame = cv2.bilateralFilter(frame, 5, 50, 100)  # smoothing filter
         frame = cv2.flip(frame, 1)  # flip the frame horizontally
         cv2.imshow('trackbar', frame)
@@ -252,22 +243,19 @@ while True:  # for 'q' key
 
         #  Main operation
         if isBgCaptured:  # this part wont run until background captured
-            #img = removeBG(frame)
             blur = cv2.GaussianBlur(frame,(5,5),0)
 
             img =  bgModel.apply(blur, learningRate=learningRate)
             cv2.imshow('mask', img)
 
-            # convert the image into binary image
-            #gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            # convert the image into binary image -- NO IT IS BW AND GRAY
 
+            ## TODO: check wether there is an impro withthe  blur mask
             #blur = cv2.GaussianBlur(img, (blurValue, blurValue), 0)
-
             #cv2.imshow('blur', blur)
 
-            ret,thresh = cv2.threshold(img,threshold,255,cv2.THRESH_BINARY)
-
-            #ret, thresh = cv2.threshold(img, 255, 255, cv2.THRESH_BINARY)
+            #Threshold phase
+            ret,thresh = cv2.threshold(img,254,255,cv2.THRESH_BINARY)
             cv2.imshow('threshold', thresh)
 
             # get the coutours
@@ -279,7 +267,6 @@ while True:  # for 'q' key
                 c = max(contours, key=cv2.contourArea)
                 (x, y, w, h) = cv2.boundingRect(c)
                 area_pixel = w * h
-                #drawing = np.zeros(img.shape, np.uint8)
 
                 #Get the 3D coordinates of the points
                 extLeft = tuple(c[c[:, :, 0].argmin()][0])
@@ -328,7 +315,6 @@ while True:  # for 'q' key
                 cv2.circle(frame, extBot, 8, (255, 255, 0), -1)
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-            #cv2.imshow('thresh', thresh)
             cv2.imshow('output', frame)
 
 
@@ -336,8 +322,8 @@ while True:  # for 'q' key
         if key == 27:  # press ESC to exit
             break
         elif key == ord('b'):  # press 'b' to capture the background
+            #Background model initialization
             bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
-            #bgModel = cv2.createBackgroundSubtractorMOG2()
             isBgCaptured = True
             print('!!!Background Captured!!!')
         elif key == ord('r'):  # press 'r' to reset the background
