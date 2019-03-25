@@ -17,6 +17,7 @@ print ('Number of arguments:', len(sys.argv), 'arguments.')
 print ('Argument List:', str(sys.argv))
 
 person_name = 'measures/'+ str(sys.argv[1]) + '-'
+kg_IN = float(sys.argv[2])
 
 camera_settings = sl.CAMERA_SETTINGS.CAMERA_SETTINGS_BRIGHTNESS
 camera_settings.camera_resolution = sl.RESOLUTION.RESOLUTION_HD720  # Use HD720 video mode (default fps: 60)
@@ -206,7 +207,6 @@ alpha_percentage = 0
 
 cv2.namedWindow('trackbar')
 cv2.createTrackbar('trh1', 'trackbar', threshold, 100, printThreshold)
-#cv2.createTrackbar('trh2', 'trackbar', gamma, 100, printThreshold)
 cv2.createTrackbar('alpha', 'trackbar', alpha_percentage, 100, printAlpha)
 cv2.createTrackbar('beta', 'trackbar', beta, 100, printBeta)
 
@@ -214,7 +214,7 @@ bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
 isBgCaptured = False
 
 #initialized dataframe for measures
-df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'dubois', 'mosteller'])
+df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'dubois', 'mosteller', 'avgError'])
 
 print_camera_information(cam)
 print_help()
@@ -234,7 +234,6 @@ while True:  # for 'q' key
         frame  = cv2.cvtColor(frame,cv2.COLOR_RGBA2RGB)
 
         threshold = cv2.getTrackbarPos('trh1', 'trackbar')
-        #gamma = cv2.getTrackbarPos('trh2', 'trackbar')
         alpha_percentage = cv2.getTrackbarPos('alpha', 'trackbar')
         alpha = applyAlpha(alpha_percentage)
 
@@ -252,12 +251,6 @@ while True:  # for 'q' key
 
             img =  bgModel.apply(blur, learningRate=learningRate)
             cv2.imshow('mask', img)
-
-            # convert the image into binary image -- NO IT IS BW AND GRAY
-
-            ## TODO: check wether there is an impro withthe  blur mask
-            #blur = cv2.GaussianBlur(img, (blurValue, blurValue), 0)
-            #cv2.imshow('blur', blur)
 
             #Threshold phase
             ret,thresh = cv2.threshold(img,254,255,cv2.THRESH_BINARY)
@@ -289,31 +282,32 @@ while True:  # for 'q' key
                 #width an height of the extreme points
                 #real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 + (extTop3D[1][2]-extBot3D[1][2])**2)
                 #real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2 + (extLeft3D[1][2]-extRight3D[1][2])**2)
-                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 )
+
+                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2)
                 real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2)
                 print('Height', real_height)
                 #estimate real height and width in mm by euclidean distance
                 if(not np.isnan(real_height) and not np.isinf(real_height) and not np.isnan(real_width) and not np.isinf(real_width)):
                     #find FRONT human surface area in m2 by proportion
                     h_file.write("{0:.2f}".format(real_height) + '\n')
-                    if (real_height < 2000 and (not real_height == 0) and (not real_width == 0)):
+                    if (real_height < 2000 and (not real_height == 0) and real_width < 1250 and (not real_width == 0)):
                         area_msquares = (real_height/1000) * (real_width/1000)
-                        shape_real_m2 = cv2.contourArea(c) * (area_msquares/area_pixel) + 0.15
+                        shape_real_m2 = (cv2.contourArea(c) * (area_msquares/area_pixel) + 0.15) *2
 
                         #weight estimation, double the surface area for the back
-                        measures = weightEstimation(shape_real_m2 * 2, real_height/1000)
+                        measures = weightEstimation(shape_real_m2, real_height/1000)
                         avgWeight = s.mean(measures)
-                        #print('Weight:', avgWeight)
+
+                        error = (abs(kg_IN-avgWeight)/kg_IN) * 100
 
                         if (avgWeight < 150 and avgWeight > 40):
                             f.write("{0:.2f}".format(avgWeight) + '\n')
-                            df = df.append(pd.Series([real_height, real_width, shape_real_m2 * 2, measures[0], measures[1]], index=df.columns ), ignore_index=True)
+                            df = df.append(pd.Series([real_height, real_width, shape_real_m2, measures[0], measures[1], error], index=df.columns ), ignore_index=True)
                             cv2.putText(frame, "Weight: " + "{0:.2f}".format(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
                             cv2.putText(frame, "Height: " + "{0:.2f}".format(real_height) + 'mm' ,(50,100), font, 1,(255,255,255),2,cv2.LINE_AA)
                             cv2.putText(frame, "Width: " + "{0:.2f}".format(real_width) + 'mm' ,(50,140), font, 1,(255,255,255),2,cv2.LINE_AA)
-                            cv2.putText(frame, "Surface: " + "{0:.2f}".format(shape_real_m2 * 2) + 'm2' ,(50,180), font, 1,(255,255,255),2,cv2.LINE_AA)
-
-
+                            cv2.putText(frame, "Surface: " + "{0:.2f}".format(shape_real_m2) + 'm2' ,(50,180), font, 1,(255,255,255),2,cv2.LINE_AA)
+                            cv2.putText(frame, "ERROR: " + "{0:.2f}".format(error) + ' %' ,(50,220), font, 1,(0,0,255),2,cv2.LINE_AA)
 
 
                 hull = cv2.convexHull(c)
