@@ -13,6 +13,11 @@ from scipy.spatial import distance
 import statistics as s
 import pandas as pd
 
+print ('Number of arguments:', len(sys.argv), 'arguments.')
+print ('Argument List:', str(sys.argv))
+
+person_name = 'measures/'+ str(sys.argv[1]) + '-'
+
 camera_settings = sl.CAMERA_SETTINGS.CAMERA_SETTINGS_BRIGHTNESS
 camera_settings.camera_resolution = sl.RESOLUTION.RESOLUTION_HD720  # Use HD720 video mode (default fps: 60)
 
@@ -209,13 +214,13 @@ bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
 isBgCaptured = False
 
 #initialized dataframe for measures
-df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'weight'])
+df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'dubois', 'mosteller'])
 
 print_camera_information(cam)
 print_help()
 
-f = open("measures.txt", "a")
-h_file = open("height.txt", "a")
+f = open(person_name + "measures.txt", "a")
+h_file = open(person_name + "height.txt", "a")
 
 key = ''
 while True:  # for 'q' key
@@ -282,26 +287,34 @@ while True:  # for 'q' key
                 extBot3D = point_cloud.get_value(extBot[0], extBot[1])
 
                 #width an height of the extreme points
-                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 + (extTop3D[1][2]-extBot3D[1][2])**2)
-                real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2 + (extLeft3D[1][2]-extRight3D[1][2])**2)
+                #real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 + (extTop3D[1][2]-extBot3D[1][2])**2)
+                #real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2 + (extLeft3D[1][2]-extRight3D[1][2])**2)
+                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 )
+                real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2)
                 print('Height', real_height)
                 #estimate real height and width in mm by euclidean distance
                 if(not np.isnan(real_height) and not np.isinf(real_height) and not np.isnan(real_width) and not np.isinf(real_width)):
                     #find FRONT human surface area in m2 by proportion
                     h_file.write("{0:.2f}".format(real_height) + '\n')
-                    if (real_height < 2000 and (not real_height == 0) and real_width < 1000 and (not real_width == 0)):
+                    if (real_height < 2000 and (not real_height == 0) and (not real_width == 0)):
                         area_msquares = (real_height/1000) * (real_width/1000)
-                        shape_real_m2 = cv2.contourArea(c) * (area_msquares/area_pixel)
+                        shape_real_m2 = cv2.contourArea(c) * (area_msquares/area_pixel) + 0.15
 
                         #weight estimation, double the surface area for the back
                         measures = weightEstimation(shape_real_m2 * 2, real_height/1000)
                         avgWeight = s.mean(measures)
-                        print('Weight:', avgWeight)
+                        #print('Weight:', avgWeight)
 
                         if (avgWeight < 150 and avgWeight > 40):
                             f.write("{0:.2f}".format(avgWeight) + '\n')
-                            df = df.append(pd.Series([real_height, real_width, shape_real_m2 * 2, avgWeight], index=df.columns ), ignore_index=True)
+                            df = df.append(pd.Series([real_height, real_width, shape_real_m2 * 2, measures[0], measures[1]], index=df.columns ), ignore_index=True)
                             cv2.putText(frame, "Weight: " + "{0:.2f}".format(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
+                            cv2.putText(frame, "Height: " + "{0:.2f}".format(real_height) + 'mm' ,(50,100), font, 1,(255,255,255),2,cv2.LINE_AA)
+                            cv2.putText(frame, "Width: " + "{0:.2f}".format(real_width) + 'mm' ,(50,140), font, 1,(255,255,255),2,cv2.LINE_AA)
+                            cv2.putText(frame, "Surface: " + "{0:.2f}".format(shape_real_m2 * 2) + 'm2' ,(50,180), font, 1,(255,255,255),2,cv2.LINE_AA)
+
+
+
 
                 hull = cv2.convexHull(c)
                 hull = cv2.convexHull(c)
@@ -336,5 +349,5 @@ f.close()
 h_file.close()
 cam.close()
 #export csv
-df.to_csv('measuresdataframe.csv', sep='\t')
+df.to_csv(person_name + 'measuresdataframe.csv', sep='\t')
 print("\nFINISH")
