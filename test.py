@@ -219,8 +219,8 @@ df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'dubois', 'mosteller'
 print_camera_information(cam)
 print_help()
 
-f = open(person_name + "measures.txt", "a")
-h_file = open(person_name + "height.txt", "a")
+#f = open(person_name + "measures.txt", "a")
+#h_file = open(person_name + "height.txt", "a")
 
 key = ''
 while True:  # for 'q' key
@@ -289,7 +289,7 @@ while True:  # for 'q' key
                 #estimate real height and width in mm by euclidean distance
                 if(not np.isnan(real_height) and not np.isinf(real_height) and not np.isnan(real_width) and not np.isinf(real_width)):
                     #find FRONT human surface area in m2 by proportion
-                    h_file.write("{0:.2f}".format(real_height) + '\n')
+                    #h_file.write("{0:.2f}".format(real_height) + '\n')
                     if (real_height < 2000 and (not real_height == 0) and real_width < 1250 and (not real_width == 0)):
                         area_msquares = (real_height/1000) * (real_width/1000)
                         shape_real_m2 = (cv2.contourArea(c) * (area_msquares/area_pixel) + 0.15) *2
@@ -301,7 +301,7 @@ while True:  # for 'q' key
                         error = (abs(kg_IN-avgWeight)/kg_IN) * 100
 
                         if (avgWeight < 150 and avgWeight > 40):
-                            f.write("{0:.2f}".format(avgWeight) + '\n')
+                            #f.write("{0:.2f}".format(avgWeight) + '\n')
                             df = df.append(pd.Series([real_height, real_width, shape_real_m2, measures[0], measures[1], error], index=df.columns ), ignore_index=True)
                             cv2.putText(frame, "Weight: " + "{0:.2f}".format(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
                             cv2.putText(frame, "Height: " + "{0:.2f}".format(real_height) + 'mm' ,(50,100), font, 1,(255,255,255),2,cv2.LINE_AA)
@@ -339,8 +339,8 @@ while True:  # for 'q' key
             print('!!!Reset BackGround!!!')
 
 cv2.destroyAllWindows()
-f.close()
-h_file.close()
+#f.close()
+#h_file.close()
 cam.close()
 #export csv
 df.to_csv(person_name + 'measuresdataframe.csv', sep='\t')

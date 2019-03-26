@@ -36,6 +36,8 @@ def printThreshold(thr):
 
 def removeBG(frame):
     fgmask = bgModel.apply(frame, learningRate=learningRate)
+    #TEST thresholding
+    ret,fgmask = cv2.threshold(fgmask,254,255,cv2.THRESH_BINARY)
     kernel = np.ones((3, 3), np.uint8)
     fgmask = cv2.erode(fgmask, kernel, iterations=1)
     res = cv2.bitwise_and(frame, frame, mask=fgmask)
@@ -222,8 +224,8 @@ print_help()
 
 f = open("measures.txt", "a")
 h_file = open("height.txt", "a")
-
 key = ''
+
 while True:  # for 'q' key
     err = cam.grab(runtime)
     if err == sl.ERROR_CODE.SUCCESS:
@@ -235,25 +237,24 @@ while True:  # for 'q' key
         frame  = cv2.cvtColor(frame,cv2.COLOR_RGBA2RGB)
 
         threshold = cv2.getTrackbarPos('trh1', 'trackbar')
-        #gamma = cv2.getTrackbarPos('trh2', 'trackbar')
         alpha_percentage = cv2.getTrackbarPos('alpha', 'trackbar')
         alpha = applyAlpha(alpha_percentage)
 
         beta = cv2.getTrackbarPos('beta', 'trackbar')
-        #gamma = gamma if gamma > 0 else 0.1
-        #frame = adjust_gamma(frame, gamma=gamma)
         frame = cv2.convertScaleAbs(frame, alpha=alpha, beta=beta)
-        #frame = cv2.normalize(frame,  frame, 0, 255, cv2.NORM_MINMAX)
         frame = cv2.bilateralFilter(frame, 5, 50, 100)  # smoothing filter
         frame = cv2.flip(frame, 1)  # flip the frame horizontally
 
         cv2.imshow('trackbar', frame)
         settings(key, cam, runtime, mat)
 
+
+
         #  Main operation
         if isBgCaptured == 1:  # this part wont run until background captured
             img = removeBG(frame)
             cv2.imshow('mask', img)
+            drawing = np.zeros(img.shape, np.uint8)
 
             # convert the image into binary image
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -273,8 +274,7 @@ while True:  # for 'q' key
                 c = max(contours, key=cv2.contourArea)
                 (x, y, w, h) = cv2.boundingRect(c)
                 area_pixel = w * h
-                drawing = np.zeros(img.shape, np.uint8)
-
+                
                 #Get the 3D coordinates of the points
                 extLeft = tuple(c[c[:, :, 0].argmin()][0])
                 extLeft3D = point_cloud.get_value(extLeft[0], extLeft[1])
@@ -289,8 +289,8 @@ while True:  # for 'q' key
                 extBot3D = point_cloud.get_value(extBot[0], extBot[1])
 
                 #width an height of the extreme points
-                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 + (extTop3D[1][2]-extBot3D[1][2])**2)
-                real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2 + (extLeft3D[1][2]-extRight3D[1][2])**2)
+                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 )
+                real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2 )
                 print('Height', real_height)
                 #estimate real height and width in mm by euclidean distance
                 if(not np.isnan(real_height) and not np.isinf(real_height) and not np.isnan(real_width) and not np.isinf(real_width)):
