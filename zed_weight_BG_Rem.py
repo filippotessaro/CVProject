@@ -13,6 +13,12 @@ from scipy.spatial import distance
 import statistics as s
 import pandas as pd
 
+print ('Number of arguments:', len(sys.argv), 'arguments.')
+print ('Argument List:', str(sys.argv))
+
+person_name = 'measures/'+ str(sys.argv[1]) + '-'
+kg_IN = float(sys.argv[2])
+
 camera_settings = sl.CAMERA_SETTINGS.CAMERA_SETTINGS_BRIGHTNESS
 camera_settings.camera_resolution = sl.RESOLUTION.RESOLUTION_HD720  # Use HD720 video mode (default fps: 60)
 
@@ -34,14 +40,6 @@ isBgCaptured = 0  # bool, whether the background captured
 def printThreshold(thr):
     print("! Changed threshold to " + str(thr))
 
-def removeBG(frame):
-    fgmask = bgModel.apply(frame, learningRate=learningRate)
-    #TEST thresholding
-    ret,fgmask = cv2.threshold(fgmask,254,255,cv2.THRESH_BINARY)
-    kernel = np.ones((3, 3), np.uint8)
-    fgmask = cv2.erode(fgmask, kernel, iterations=1)
-    res = cv2.bitwise_and(frame, frame, mask=fgmask)
-    return res
 
 def weightEstimation(body_surface, height):
     '''
@@ -209,23 +207,22 @@ alpha_percentage = 0
 
 cv2.namedWindow('trackbar')
 cv2.createTrackbar('trh1', 'trackbar', threshold, 100, printThreshold)
-#cv2.createTrackbar('trh2', 'trackbar', gamma, 100, printThreshold)
 cv2.createTrackbar('alpha', 'trackbar', alpha_percentage, 100, printAlpha)
 cv2.createTrackbar('beta', 'trackbar', beta, 100, printBeta)
 
 bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
-isBgCaptured = 0
+isBgCaptured = False
 
 #initialized dataframe for measures
-df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'weight'])
+df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'dubois', 'mosteller', 'real_weight'])
 
 print_camera_information(cam)
 print_help()
 
-f = open("measures.txt", "a")
-h_file = open("height.txt", "a")
-key = ''
+#f = open(person_name + "measures.txt", "a")
+#h_file = open(person_name + "height.txt", "a")
 
+key = ''
 while True:  # for 'q' key
     err = cam.grab(runtime)
     if err == sl.ERROR_CODE.SUCCESS:
@@ -244,26 +241,20 @@ while True:  # for 'q' key
         frame = cv2.convertScaleAbs(frame, alpha=alpha, beta=beta)
         frame = cv2.bilateralFilter(frame, 5, 50, 100)  # smoothing filter
         frame = cv2.flip(frame, 1)  # flip the frame horizontally
-
         cv2.imshow('trackbar', frame)
+
         settings(key, cam, runtime, mat)
 
-
-
         #  Main operation
-        if isBgCaptured == 1:  # this part wont run until background captured
-            img = removeBG(frame)
+        if isBgCaptured:  # this part wont run until background captured
+            blur = cv2.GaussianBlur(frame,(5,5),0)
+
+            img =  bgModel.apply(blur, learningRate=learningRate)
             cv2.imshow('mask', img)
-            drawing = np.zeros(img.shape, np.uint8)
 
-            # convert the image into binary image
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-            blur = cv2.GaussianBlur(gray, (blurValue, blurValue), 0)
-
-            cv2.imshow('blur', blur)
-            ret, thresh = cv2.threshold(blur, threshold, 255, cv2.THRESH_BINARY)
-            cv2.imshow('ori', thresh)
+            #Threshold phase
+            ret,thresh = cv2.threshold(img,254,255,cv2.THRESH_BINARY)
+            cv2.imshow('threshold', thresh)
 
             # get the coutours
             thresh1 = copy.deepcopy(thresh)
@@ -274,7 +265,7 @@ while True:  # for 'q' key
                 c = max(contours, key=cv2.contourArea)
                 (x, y, w, h) = cv2.boundingRect(c)
                 area_pixel = w * h
-                
+
                 #Get the 3D coordinates of the points
                 extLeft = tuple(c[c[:, :, 0].argmin()][0])
                 extLeft3D = point_cloud.get_value(extLeft[0], extLeft[1])
@@ -289,47 +280,57 @@ while True:  # for 'q' key
                 extBot3D = point_cloud.get_value(extBot[0], extBot[1])
 
                 #width an height of the extreme points
-                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 )
-                real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2 )
+                #real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 + (extTop3D[1][2]-extBot3D[1][2])**2)
+                #real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2 + (extLeft3D[1][2]-extRight3D[1][2])**2)
+
+                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2)
+                real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2)
                 print('Height', real_height)
                 #estimate real height and width in mm by euclidean distance
                 if(not np.isnan(real_height) and not np.isinf(real_height) and not np.isnan(real_width) and not np.isinf(real_width)):
                     #find FRONT human surface area in m2 by proportion
-                    h_file.write("{0:.2f}".format(real_height) + '\n')
+                    #h_file.write("{0:.2f}".format(real_height) + '\n')
                     if (real_height < 2000 and (not real_height == 0) and real_width < 1250 and (not real_width == 0)):
                         area_msquares = (real_height/1000) * (real_width/1000)
-                        shape_real_m2 = cv2.contourArea(c) * (area_msquares/area_pixel)
+                        shape_real_m2 = (cv2.contourArea(c) * (area_msquares/area_pixel) + 0.15) *2
 
                         #weight estimation, double the surface area for the back
-                        measures = weightEstimation(shape_real_m2 * 2, real_height/1000)
+                        measures = weightEstimation(shape_real_m2, real_height/1000)
                         avgWeight = s.mean(measures)
-                        print('Weight:', avgWeight)
+
+                        error = (abs(kg_IN-avgWeight)/kg_IN) * 100
 
                         if (avgWeight < 150 and avgWeight > 40):
-                            f.write("{0:.2f}".format(avgWeight) + '\n')
-                            df = df.append(pd.Series([real_height, real_width, shape_real_m2 * 2, avgWeight], index=df.columns ), ignore_index=True)
-                            cv2.putText(drawing, "Weight: " + "{0:.2f}".format(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
+                            df = df.append(pd.Series([real_height, real_width, shape_real_m2, measures[0], measures[1], kg_IN], index=df.columns ), ignore_index=True)
+                            cv2.putText(frame, "Weight: " + "{0:.2f}".format(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
+                            cv2.putText(frame, "Height: " + "{0:.2f}".format(real_height) + 'mm' ,(50,100), font, 1,(255,255,255),2,cv2.LINE_AA)
+                            cv2.putText(frame, "Width: " + "{0:.2f}".format(real_width) + 'mm' ,(50,140), font, 1,(255,255,255),2,cv2.LINE_AA)
+                            cv2.putText(frame, "Surface: " + "{0:.2f}".format(shape_real_m2) + 'm2' ,(50,180), font, 1,(255,255,255),2,cv2.LINE_AA)
+                            cv2.putText(frame, "ERROR: " + "{0:.2f}".format(error) + ' %' ,(50,220), font, 1,(0,0,255),2,cv2.LINE_AA)
+
 
                 hull = cv2.convexHull(c)
                 hull = cv2.convexHull(c)
 
                 #draw all the shapes
-                cv2.drawContours(drawing, [c], 0, (0, 255, 0), 2)
-                cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
-                cv2.circle(drawing, extLeft, 8, (0, 0, 255), -1)
-                cv2.circle(drawing, extRight, 8, (0, 255, 0), -1)
-                cv2.circle(drawing, extTop, 8, (255, 0, 0), -1)
-                cv2.circle(drawing, extBot, 8, (255, 255, 0), -1)
-                cv2.rectangle(drawing, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                cv2.drawContours(frame, [c], 0, (0, 255, 0), 2)
+                cv2.drawContours(frame, [hull], 0, (0, 0, 255), 3)
+                cv2.circle(frame, extLeft, 8, (0, 0, 255), -1)
+                cv2.circle(frame, extRight, 8, (0, 255, 0), -1)
+                cv2.circle(frame, extTop, 8, (255, 0, 0), -1)
+                cv2.circle(frame, extBot, 8, (255, 255, 0), -1)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-            cv2.imshow('output', drawing)
+            cv2.imshow('output', frame)
+
 
         key = cv2.waitKey(10)
         if key == 27:  # press ESC to exit
             break
         elif key == ord('b'):  # press 'b' to capture the background
-            bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold, detectShadows = True)
-            isBgCaptured = 1
+            #Background model initialization
+            bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
+            isBgCaptured = True
             print('!!!Background Captured!!!')
         elif key == ord('r'):  # press 'r' to reset the background
             bgModel = None
@@ -337,9 +338,9 @@ while True:  # for 'q' key
             print('!!!Reset BackGround!!!')
 
 cv2.destroyAllWindows()
-f.close()
-h_file.close()
+#f.close()
+#h_file.close()
 cam.close()
 #export csv
-df.to_csv('measuresdataframe.csv', sep='\t')
+df.to_csv(person_name + 'measuresdataframe.csv', sep='\t')
 print("\nFINISH")
