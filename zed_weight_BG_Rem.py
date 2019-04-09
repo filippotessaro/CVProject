@@ -280,12 +280,11 @@ while True:  # for 'q' key
                 extBot3D = point_cloud.get_value(extBot[0], extBot[1])
 
                 #width an height of the extreme points
-                #real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 + (extTop3D[1][2]-extBot3D[1][2])**2)
+                #real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 + (extTop3D[1][2]-extBot3D[1][2])**2) * 0.85
                 #real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2 + (extLeft3D[1][2]-extRight3D[1][2])**2)
 
-                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2)
-                real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2)
-                print('Height', real_height)
+                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2) 
+                real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][2]-extRight3D[1][2])**2)
                 #estimate real height and width in mm by euclidean distance
                 if(not np.isnan(real_height) and not np.isinf(real_height) and not np.isnan(real_width) and not np.isinf(real_width)):
                     #find FRONT human surface area in m2 by proportion
@@ -342,5 +341,5 @@ cv2.destroyAllWindows()
 #h_file.close()
 cam.close()
 #export csv
-df.to_csv(person_name + 'measuresdataframe.csv', sep='\t')
+df.to_csv(person_name + '_data.csv', sep='\t')
 print("\nFINISH")

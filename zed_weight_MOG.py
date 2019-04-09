@@ -25,8 +25,8 @@ camera_settings.camera_resolution = sl.RESOLUTION.RESOLUTION_HD720  # Use HD720 
 str_camera_settings = "BRIGHTNESS"
 step_camera_settings = 1
 
-#----Added parameters
-threshold = 60  # BINARY threshold
+#Mask parameters
+threshold = 50  # BINARY threshold
 blurValue = 15  # GaussianBlur parameter
 bgSubThreshold = 50
 learningRate = 0
@@ -34,7 +34,6 @@ learningRate = 0
 area_pixel = 0
 area_msquares = 0
 
-# variables
 isBgCaptured = 0  # bool, whether the background captured
 
 def printThreshold(thr):
@@ -280,17 +279,17 @@ while True:  # for 'q' key
                 extBot3D = point_cloud.get_value(extBot[0], extBot[1])
 
                 #width an height of the extreme points
-                #real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 + (extTop3D[1][2]-extBot3D[1][2])**2)
+                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 + (extTop3D[1][2]-extBot3D[1][2])**2)
                 #real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2 + (extLeft3D[1][2]-extRight3D[1][2])**2)
 
-                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2)
+                #real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2)-200
+                #real_height = extTop3D[1][1]-extBot3D[1][1]
                 real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2)
                 print('Height', real_height)
                 #estimate real height and width in mm by euclidean distance
                 if(not np.isnan(real_height) and not np.isinf(real_height) and not np.isnan(real_width) and not np.isinf(real_width)):
                     #find FRONT human surface area in m2 by proportion
-                    #h_file.write("{0:.2f}".format(real_height) + '\n')
-                    if (real_height < 2000 and (not real_height == 0) and real_width < 1250 and (not real_width == 0)):
+                    if (real_height < 2000 and (real_height > 0) and real_width < 1250 and (real_width > 0)):
                         area_msquares = (real_height/1000) * (real_width/1000)
                         shape_real_m2 = (cv2.contourArea(c) * (area_msquares/area_pixel) + 0.15) *2
 
@@ -301,7 +300,6 @@ while True:  # for 'q' key
                         error = (abs(kg_IN-avgWeight)/kg_IN) * 100
 
                         if (avgWeight < 150 and avgWeight > 40):
-                            #f.write("{0:.2f}".format(avgWeight) + '\n')
                             df = df.append(pd.Series([real_height, real_width, shape_real_m2, measures[0], measures[1], error], index=df.columns ), ignore_index=True)
                             cv2.putText(frame, "Weight: " + "{0:.2f}".format(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
                             cv2.putText(frame, "Height: " + "{0:.2f}".format(real_height) + 'mm' ,(50,100), font, 1,(255,255,255),2,cv2.LINE_AA)
@@ -339,8 +337,6 @@ while True:  # for 'q' key
             print('!!!Reset BackGround!!!')
 
 cv2.destroyAllWindows()
-#f.close()
-#h_file.close()
 cam.close()
 #export csv
 df.to_csv(person_name + 'measuresdataframe.csv', sep='\t')
