@@ -8,8 +8,6 @@ import numpy as np
 import copy
 import math
 import time
-import pyautogui
-from scipy.spatial import distance
 import statistics as s
 import pandas as pd
 
