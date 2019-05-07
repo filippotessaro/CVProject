@@ -17,6 +17,8 @@ print ('Argument List:', str(sys.argv))
 person_name = 'measures/'+ str(sys.argv[1]) + '-'
 kg_IN = float(sys.argv[2])
 
+height_arg3 = int(sys.argv[3])
+
 camera_settings = sl.CAMERA_SETTINGS.CAMERA_SETTINGS_BRIGHTNESS
 camera_settings.camera_resolution = sl.RESOLUTION.RESOLUTION_HD720  # Use HD720 video mode (default fps: 60)
 
@@ -212,7 +214,7 @@ bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
 isBgCaptured = False
 
 #initialized dataframe for measures
-df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'dubois', 'mosteller', 'real_weight'])
+df = pd.DataFrame(columns=['height', 'width', 'shapeArea', 'dubois', 'mosteller', 'real_weight', 'real_height'])
 
 print_camera_information(cam)
 print_help()
@@ -256,7 +258,7 @@ while True:  # for 'q' key
 
             # get the coutours
             thresh1 = copy.deepcopy(thresh)
-            _, contours, hierarchy = cv2.findContours(thresh1, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours, hierarchy = cv2.findContours(thresh1, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             length = len(contours)
 
             if length > 0:
@@ -281,7 +283,7 @@ while True:  # for 'q' key
                 #real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2 + (extTop3D[1][2]-extBot3D[1][2])**2) * 0.85
                 #real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][1]-extRight3D[1][1])**2 + (extLeft3D[1][2]-extRight3D[1][2])**2)
 
-                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2) 
+                real_height = math.sqrt((extTop3D[1][0]-extBot3D[1][0])**2 + (extTop3D[1][1]-extBot3D[1][1])**2)
                 real_width = math.sqrt((extLeft3D[1][0]-extRight3D[1][0])**2 + (extLeft3D[1][2]-extRight3D[1][2])**2)
                 #estimate real height and width in mm by euclidean distance
                 if(not np.isnan(real_height) and not np.isinf(real_height) and not np.isnan(real_width) and not np.isinf(real_width)):
@@ -298,7 +300,7 @@ while True:  # for 'q' key
                         error = (abs(kg_IN-avgWeight)/kg_IN) * 100
 
                         if (avgWeight < 150 and avgWeight > 40):
-                            df = df.append(pd.Series([real_height, real_width, shape_real_m2, measures[0], measures[1], kg_IN], index=df.columns ), ignore_index=True)
+                            df = df.append(pd.Series([real_height, real_width, shape_real_m2, measures[0], measures[1], kg_IN, height_arg3], index=df.columns ), ignore_index=True)
                             cv2.putText(frame, "Weight: " + "{0:.2f}".format(avgWeight) + 'Kg' ,(x,y), font, 1,(255,255,255),2,cv2.LINE_AA)
                             cv2.putText(frame, "Height: " + "{0:.2f}".format(real_height) + 'mm' ,(50,100), font, 1,(255,255,255),2,cv2.LINE_AA)
                             cv2.putText(frame, "Width: " + "{0:.2f}".format(real_width) + 'mm' ,(50,140), font, 1,(255,255,255),2,cv2.LINE_AA)
@@ -339,5 +341,5 @@ cv2.destroyAllWindows()
 #h_file.close()
 cam.close()
 #export csv
-df.to_csv(person_name + '_data.csv', sep='\t')
+df.to_csv(person_name + 'data.csv', sep='\t')
 print("\nFINISH")
