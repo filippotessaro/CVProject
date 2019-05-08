@@ -11,7 +11,7 @@ the ZED camera acquire the video and then at every frame the program compute the
 ### Requirements
 * ZED Stereo Camera
 * Python 3
-* OpenCV for Python (installed via anaconda with the command `conda install opencv`)
+* OpenCV for Python (installed via anaconda with the command `pip3 install opencv-python`)
 * [CUDA gpu support](https://developer.nvidia.com/cuda-downloads)
 * [ZED SDK](https://www.stereolabs.com/developers/)
 
@@ -20,5 +20,5 @@ the ZED camera acquire the video and then at every frame the program compute the
 In order to run the application we need to write down the following code in the terminal:
 
 ```
-Python3 test.py person_name weight_in_kg
+Python3 main.py person_name weight_in_kg height_in_mm
 ```
